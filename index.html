@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Escribano Martin Acosta | Agenda de citas</title>
+    <link rel="icon" href="assets/agenda.ico" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacion principal">
+        <div class="brand">
+          <img class="brand-logo" src="assets/agenda-logo.png" alt="" />
+          <div>
+            <p class="eyebrow">Escribano</p>
+            <h1>Martin Acosta</h1>
+            <span>Agenda de citas notariales</span>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="Vistas">
+          <button class="nav-tab active" type="button" data-view="booking">
+            <span aria-hidden="true">+</span>
+            Nueva cita
+          </button>
+          <button class="nav-tab" type="button" data-view="agenda">
+            <span aria-hidden="true">#</span>
+            Agenda
+          </button>
+          <button class="nav-tab" type="button" data-view="cash">
+            <span aria-hidden="true">$</span>
+            Caja
+          </button>
+          <button class="nav-tab" type="button" data-view="dashboard">
+            <span aria-hidden="true">%</span>
+            Dashboard
+          </button>
+          <button class="nav-tab" type="button" data-view="settings">
+            <span aria-hidden="true">*</span>
+            Horarios
+          </button>
+        </nav>
+
+        <div class="agent-card compact">
+          <p class="eyebrow">Agente de agenda</p>
+          <strong id="agentSidebarTitle">Listo para reservar</strong>
+          <span id="agentSidebarText">El asistente revisa disponibilidad, datos faltantes y proximas citas.</span>
+        </div>
+
+        <div class="today-box">
+          <p class="eyebrow">Hoy</p>
+          <strong id="todayLabel"></strong>
+          <span id="todayCount"></span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="topbar" aria-label="Resumen de agenda">
+          <div>
+            <p class="eyebrow">Estudio notarial</p>
+            <h2 id="viewTitle">Nueva cita</h2>
+            <p class="page-subtitle">Sistema privado para gestionar reservas y citas del Escribano Martin Acosta.</p>
+          </div>
+          <div class="stats" aria-label="Indicadores">
+            <div>
+              <span id="pendingStat">0</span>
+              <small>Pendientes</small>
+            </div>
+            <div>
+              <span id="weekStat">0</span>
+              <small>Esta semana</small>
+            </div>
+            <div>
+              <span id="totalStat">0</span>
+              <small>Total</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="view active" id="bookingView">
+          <div class="booking-layout">
+            <form class="booking-form" id="bookingForm">
+              <div class="panel">
+                <div class="section-title">
+                  <span>1</span>
+                  <div>
+                    <h3>Tramite</h3>
+                    <p>Selecciona el motivo principal de la cita.</p>
+                  </div>
+                </div>
+                <div class="service-grid" id="serviceGrid"></div>
+              </div>
+
+              <div class="panel">
+                <div class="section-title">
+                  <span>2</span>
+                  <div>
+                    <h3>Fecha y hora</h3>
+                    <p>Los horarios ocupados o bloqueados no se pueden reservar.</p>
+                  </div>
+                </div>
+                <div class="date-row">
+                  <label>
+                    Fecha
+                    <input id="bookingDate" name="date" type="date" required />
+                  </label>
+                  <label>
+                    Duracion
+                    <select id="duration" name="duration">
+                      <option value="30">30 min</option>
+                      <option value="45">45 min</option>
+                      <option value="60">60 min</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="slot-grid" id="slotGrid" aria-label="Horarios disponibles"></div>
+              </div>
+
+              <div class="panel">
+                <div class="section-title">
+                  <span>3</span>
+                  <div>
+                    <h3>Cliente</h3>
+                    <p>La informacion queda guardada en la base de datos.</p>
+                  </div>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    Nombre completo
+                    <input id="clientName" name="clientName" type="text" autocomplete="name" required />
+                  </label>
+                  <label>
+                    Telefono
+                    <input id="clientPhone" name="clientPhone" type="tel" autocomplete="tel" required />
+                  </label>
+                  <label>
+                    Email
+                    <input id="clientEmail" name="clientEmail" type="email" autocomplete="email" />
+                  </label>
+                  <label>
+                    Documento
+                    <input id="clientDocument" name="clientDocument" type="text" inputmode="numeric" />
+                  </label>
+                </div>
+                <label class="full-label">
+                  Observaciones
+                  <textarea id="notes" name="notes" rows="4" placeholder="Ej.: trae cedula, partida, datos del inmueble o borrador del contrato."></textarea>
+                </label>
+                <div class="form-actions">
+                  <button class="primary-action" id="createAppointment" type="submit">Crear cita</button>
+                  <button class="secondary-action" id="clearForm" type="button">Limpiar</button>
+                </div>
+                <p class="form-message" id="formMessage" role="status"></p>
+              </div>
+            </form>
+
+            <aside class="agent-panel" aria-label="Asistente de agenda">
+              <div class="agent-header">
+                <div class="agent-avatar" aria-hidden="true">A</div>
+                <div>
+                  <p class="eyebrow">Asistente</p>
+                  <h3>Agente de reservas</h3>
+                </div>
+              </div>
+              <p id="agentMessage" class="agent-message"></p>
+              <div class="agent-actions">
+                <button class="secondary-action" id="findNextSlot" type="button">Buscar proximo horario</button>
+                <button class="secondary-action" id="copyReminder" type="button">Copiar recordatorio</button>
+              </div>
+              <div class="agent-summary">
+                <span>Seleccion actual</span>
+                <strong id="selectionSummary">Sin horario seleccionado</strong>
+              </div>
+              <div class="agent-checklist" id="agentChecklist"></div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="agendaView">
+          <div class="agenda-actions">
+            <label>
+              Semana de
+              <input id="agendaDate" type="date" />
+            </label>
+            <label>
+              Estado
+              <select id="statusFilter">
+                <option value="all">Todos</option>
+                <option value="pending">Pendientes</option>
+                <option value="confirmed">Confirmadas</option>
+                <option value="cancelled">Canceladas</option>
+              </select>
+            </label>
+            <label>
+              Buscar
+              <input id="agendaSearch" type="search" placeholder="Cliente, telefono, tramite..." />
+            </label>
+            <button class="secondary-action" id="previousWeek" type="button">Semana anterior</button>
+            <button class="secondary-action" id="currentWeek" type="button">Hoy</button>
+            <button class="secondary-action" id="nextWeek" type="button">Semana siguiente</button>
+            <button class="secondary-action" id="exportCsv" type="button">Exportar CSV</button>
+          </div>
+          <div class="week-heading">
+            <div>
+              <p class="eyebrow">Calendario semanal</p>
+              <h3 id="weekLabel"></h3>
+            </div>
+            <button class="secondary-action" id="enableNotifications" type="button">Activar notificaciones</button>
+          </div>
+          <div class="week-calendar" id="weekCalendar" aria-label="Calendario semanal"></div>
+
+          <div class="agenda-reminders-layout">
+            <section class="panel">
+              <div class="section-title">
+                <span>#</span>
+                <div>
+                  <h3 id="selectedDayTitle">Citas del dia</h3>
+                  <p>Detalle operativo del dia seleccionado en el calendario.</p>
+                </div>
+              </div>
+              <div class="agenda-list" id="agendaList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="section-title">
+                <span>!</span>
+                <div>
+                  <h3>Recordatorios</h3>
+                  <p>Se guardan en la base y notifican en Windows cuando la app esta abierta.</p>
+                </div>
+              </div>
+              <form class="reminder-form" id="reminderForm">
+                <div class="form-grid">
+                  <label>
+                    Titulo
+                    <input id="reminderTitle" name="title" type="text" placeholder="Ej.: llamar al cliente" required />
+                  </label>
+                  <label>
+                    Fecha y hora
+                    <input id="reminderDueAt" name="dueAt" type="datetime-local" required />
+                  </label>
+                </div>
+                <label class="full-label">
+                  Nota
+                  <textarea id="reminderMessage" name="message" rows="3" placeholder="Detalle del recordatorio"></textarea>
+                </label>
+                <button class="primary-action" id="createReminder" type="submit">Crear recordatorio</button>
+              </form>
+              <div class="reminder-list" id="reminderList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="cashView">
+          <div class="cash-layout">
+            <form class="panel cash-form" id="cashForm">
+              <div class="section-title">
+                <span>$</span>
+                <div>
+                  <h3>Movimiento de caja</h3>
+                  <p>Registra pagos de firmas, honorarios, gastos y salidas operativas.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label>
+                  Tipo
+                  <select id="cashType" name="type" required>
+                    <option value="income">Ingreso</option>
+                    <option value="expense">Gasto</option>
+                  </select>
+                </label>
+                <label>
+                  Fecha
+                  <input id="cashDate" name="date" type="date" required />
+                </label>
+                <label>
+                  Importe
+                  <input id="cashAmount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+                </label>
+                <label>
+                  Medio de pago
+                  <select id="cashMethod" name="paymentMethod">
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </label>
+                <label>
+                  Categoria
+                  <select id="cashCategory" name="category"></select>
+                </label>
+                <label>
+                  Cliente o proveedor
+                  <input id="cashParty" name="party" type="text" placeholder="Ej.: Cliente, gestor, proveedor" />
+                </label>
+              </div>
+              <label class="full-label">
+                Concepto
+                <input id="cashConcept" name="concept" type="text" placeholder="Ej.: pago de certificacion de firmas" required />
+              </label>
+              <label class="full-label">
+                Observaciones
+                <textarea id="cashNotes" name="notes" rows="3" placeholder="Detalle interno del movimiento"></textarea>
+              </label>
+              <div class="form-actions">
+                <button class="primary-action" id="saveCashTransaction" type="submit">Guardar movimiento</button>
+                <button class="secondary-action" id="clearCashForm" type="button">Limpiar</button>
+              </div>
+              <p class="form-message" id="cashMessage" role="status"></p>
+            </form>
+
+            <div class="cash-side">
+              <section class="panel">
+                <div class="section-title">
+                  <span>OK</span>
+                  <div>
+                    <h3>Resumen mensual</h3>
+                    <p>Control rapido de ingresos, egresos y saldo del mes.</p>
+                  </div>
+                </div>
+                <div class="cash-filters">
+                  <label>
+                    Mes
+                    <input id="cashMonth" type="month" />
+                  </label>
+                  <label>
+                    Ver
+                    <select id="cashFilterType">
+                      <option value="all">Todos</option>
+                      <option value="income">Ingresos</option>
+                      <option value="expense">Gastos</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="finance-summary" id="cashSummary"></div>
+              </section>
+
+              <section class="panel">
+                <div class="section-title">
+                  <span>#</span>
+                  <div>
+                    <h3>Cierre mensual</h3>
+                    <p>Congela el resultado del mes para control administrativo.</p>
+                  </div>
+                </div>
+                <div class="closure-actions">
+                  <button class="primary-action" id="closeCashMonth" type="button">Crear cierre del mes</button>
+                </div>
+                <div class="closure-list" id="closureList"></div>
+              </section>
+            </div>
+          </div>
+
+          <section class="panel">
+            <div class="section-title">
+              <span>MX</span>
+              <div>
+                <h3>Movimientos</h3>
+                <p>Historial filtrado por mes y tipo de movimiento.</p>
+              </div>
+            </div>
+            <div class="cash-list" id="cashTransactionList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="dashboardView">
+          <div class="dashboard-toolbar">
+            <label>
+              Mes de analisis
+              <input id="dashboardMonth" type="month" />
+            </label>
+          </div>
+          <div class="dashboard-kpis" id="dashboardKpis"></div>
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="section-title">
+                <span>$</span>
+                <div>
+                  <h3>Flujo de caja</h3>
+                  <p>Ingresos, gastos y saldo por mes.</p>
+                </div>
+              </div>
+              <div class="bar-chart" id="cashFlowChart"></div>
+            </section>
+            <section class="panel">
+              <div class="section-title">
+                <span>#</span>
+                <div>
+                  <h3>Citas por tramite</h3>
+                  <p>Distribucion de trabajo notarial del mes.</p>
+                </div>
+              </div>
+              <div class="bar-chart" id="serviceChart"></div>
+            </section>
+            <section class="panel">
+              <div class="section-title">
+                <span>OK</span>
+                <div>
+                  <h3>Estado de agenda</h3>
+                  <p>Pendientes, confirmadas y canceladas.</p>
+                </div>
+              </div>
+              <div class="status-dashboard" id="statusDashboard"></div>
+            </section>
+            <section class="panel">
+              <div class="section-title">
+                <span>!</span>
+                <div>
+                  <h3>Proximas acciones</h3>
+                  <p>Citas cercanas y recordatorios activos.</p>
+                </div>
+              </div>
+              <div class="insight-list" id="dashboardInsights"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="settingsView">
+          <div class="settings-grid">
+            <div class="panel">
+              <div class="section-title">
+                <span>*</span>
+                <div>
+                  <h3>Horario de atencion</h3>
+                  <p>Define la disponibilidad general del estudio.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label>
+                  Apertura
+                  <input id="startHour" type="time" value="09:00" />
+                </label>
+                <label>
+                  Cierre
+                  <input id="endHour" type="time" value="17:00" />
+                </label>
+                <label>
+                  Pausa desde
+                  <input id="breakStart" type="time" value="13:00" />
+                </label>
+                <label>
+                  Pausa hasta
+                  <input id="breakEnd" type="time" value="14:00" />
+                </label>
+              </div>
+              <fieldset class="weekdays">
+                <legend>Dias habiles</legend>
+                <label><input type="checkbox" value="1" checked /> Lun</label>
+                <label><input type="checkbox" value="2" checked /> Mar</label>
+                <label><input type="checkbox" value="3" checked /> Mie</label>
+                <label><input type="checkbox" value="4" checked /> Jue</label>
+                <label><input type="checkbox" value="5" checked /> Vie</label>
+                <label><input type="checkbox" value="6" /> Sab</label>
+              </fieldset>
+              <button class="primary-action" id="saveSettings" type="button">Guardar horarios</button>
+            </div>
+
+            <div class="panel">
+              <div class="section-title">
+                <span>-</span>
+                <div>
+                  <h3>Bloquear horario</h3>
+                  <p>Reserva espacios para firmas fuera del estudio, audiencias o descanso.</p>
+                </div>
+              </div>
+              <div class="date-row">
+                <label>
+                  Fecha
+                  <input id="blockDate" type="date" />
+                </label>
+                <label>
+                  Hora
+                  <input id="blockTime" type="time" step="1800" />
+                </label>
+              </div>
+              <button class="secondary-action" id="addBlock" type="button">Bloquear</button>
+              <div class="blocked-list" id="blockedList"></div>
+            </div>
+
+            <div class="panel">
+              <div class="section-title">
+                <span>OK</span>
+                <div>
+                  <h3>Seguridad de datos</h3>
+                  <p>Base local, backups y verificacion rapida del guardado.</p>
+                </div>
+              </div>
+              <div class="data-status">
+                <div>
+                  <span>Base de datos</span>
+                  <strong id="databaseStatus">Verificando...</strong>
+                </div>
+                <div>
+                  <span>Ubicacion de datos</span>
+                  <strong id="dataPath">-</strong>
+                </div>
+                <div>
+                  <span>Backups</span>
+                  <strong id="backupPath">-</strong>
+                </div>
+              </div>
+              <button class="primary-action" id="backupNow" type="button">Crear backup ahora</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

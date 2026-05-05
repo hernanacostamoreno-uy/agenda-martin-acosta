@@ -1,0 +1,76 @@
+AGENDA DEL ESCRIBANO MARTIN ACOSTA
+
+1. Instalar la agenda
+
+Hacer doble clic en:
+Agenda-Martin-Acosta-Setup.exe
+
+Esto instala la aplicacion y crea un acceso directo en el Escritorio con logo propio.
+
+Si Windows pregunta si se permite ejecutar el instalador, aceptar solamente si el archivo vino de la carpeta entregada.
+
+2. Abrir la agenda
+
+Hacer doble clic en el acceso directo:
+Agenda Martin Acosta
+
+Se abre una ventana tipo aplicacion.
+Usar la agenda desde esa ventana.
+
+3. Acceso directo
+
+Si se usa sin instalar, hacer doble clic en:
+Agenda-Martin-Acosta.exe
+
+Si ese archivo no esta, usar:
+Agenda-Martin-Acosta.bat
+
+4. Guardado de datos
+
+Las citas quedan guardadas en:
+%LOCALAPPDATA%\AgendaMartinAcosta\datos\agenda_martin_acosta.db
+
+Ese archivo es la agenda real. No borrarlo.
+
+La agenda guarda los cambios al crear citas, cambiar estados, bloquear horarios, modificar horarios o crear recordatorios.
+Si hay datos escritos sin guardar, la app avisa antes de cerrar.
+
+5. Agenda semanal
+
+En la pestaña Agenda se ve la semana completa.
+Se puede cambiar de semana, volver a Hoy y hacer clic en un dia para ver sus citas.
+
+6. Recordatorios
+
+En la pestaña Agenda se pueden crear recordatorios con fecha y hora.
+Para recibir avisos de Windows, presionar Activar notificaciones.
+La aplicacion debe estar abierta para mostrar notificaciones.
+
+7. Backup
+
+La app crea un backup automatico diario en:
+%LOCALAPPDATA%\AgendaMartinAcosta\backups
+
+Para hacer un backup manual, hacer doble clic en:
+hacer-backup.bat
+
+Tambien se puede crear un backup desde la pestaña Horarios, en Seguridad de datos.
+
+Recomendacion: copiar la carpeta %LOCALAPPDATA%\AgendaMartinAcosta a OneDrive, Google Drive o un pendrive una vez por semana.
+
+8. Caja
+
+En la pestaña Caja se pueden cargar ingresos y gastos.
+Sirve para pagos de firmas, certificaciones, escrituras, consultas, anticipos, tasas, timbres, servicios, insumos y otros gastos.
+
+Tambien se puede crear un cierre mensual con ingresos, egresos, saldo y cantidad de movimientos.
+
+9. Dashboard
+
+En la pestaña Dashboard se ven indicadores del estudio:
+saldo mensual, citas por tramite, estados de agenda, proximas citas y recordatorios activos.
+
+10. Cerrar la agenda
+
+Cerrar la ventana de la aplicacion.
+El motor local se apaga solo.

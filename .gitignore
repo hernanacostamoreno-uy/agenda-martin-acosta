@@ -1,0 +1,27 @@
+# Datos reales de la escribania
+datos/
+*.db
+*.db-shm
+*.db-wal
+
+# Temporales de pruebas y empaquetado
+build/
+install-test/
+install-test-*/
+visual-*.png
+visual-*.mjs
+visual-*.pid
+visual-edge-profile*/
+visual-test-backups/
+agenda_test_backups/
+
+# Paquetes redundantes o intermedios
+Agenda-Martin-Acosta-Payload.zip
+Agenda-Martin-Acosta-Instalable.zip
+
+# Runtime pesado incluido dentro del instalador final
+runtime/
+
+# Sistema / editor
+Thumbs.db
+.DS_Store

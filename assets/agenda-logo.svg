@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Agenda Martin Acosta">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="20" x2="224" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#102033"/>
+      <stop offset="0.58" stop-color="#176B66"/>
+      <stop offset="1" stop-color="#B88935"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="72" y1="60" x2="184" y2="202" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7D28B"/>
+      <stop offset="1" stop-color="#B88935"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+  <rect x="22" y="22" width="212" height="212" rx="36" fill="none" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="3"/>
+  <path d="M128 47 193 73v48c0 43-25 76-65 91-40-15-65-48-65-91V73l65-26Z" fill="#FFFFFF" fill-opacity="0.1" stroke="url(#gold)" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M82 154h92" stroke="url(#gold)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M128 81v73" stroke="url(#gold)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M101 104h54" stroke="url(#gold)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M100 104 78 142h44l-22-38Zm56 0-22 38h44l-22-38Z" fill="#FFFFFF" fill-opacity="0.16" stroke="#F7D28B" stroke-width="5" stroke-linejoin="round"/>
+  <text x="128" y="215" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="800" fill="#FFFFFF">MA</text>
+</svg>

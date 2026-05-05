@@ -1,0 +1,4 @@
+@echo off
+cd /d "%~dp0"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$node=Join-Path (Get-Location) 'runtime\node.exe'; if(!(Test-Path $node)){ $node='node' }; $db=Join-Path (Get-Location) 'agenda_test.db'; $backupDir=Join-Path (Get-Location) 'agenda_test_backups'; if(Test-Path $db){Remove-Item $db -Force}; if(Test-Path $backupDir){Remove-Item $backupDir -Recurse -Force}; $job=Start-Job -ScriptBlock { param($dir,$db,$backupDir,$node) Set-Location $dir; $env:PORT='8123'; $env:DB_PATH=$db; $env:BACKUP_DIR=$backupDir; & $node --no-warnings server.js } -ArgumentList (Get-Location).Path,$db,$backupDir,$node; try { Start-Sleep -Seconds 1; $env:BASE_URL='http://127.0.0.1:8123'; & $node --no-warnings test-app.js } finally { Stop-Job $job -ErrorAction SilentlyContinue; Remove-Job $job -ErrorAction SilentlyContinue; Remove-Item $db -Force -ErrorAction SilentlyContinue; Remove-Item $backupDir -Recurse -Force -ErrorAction SilentlyContinue }"
+pause
