@@ -25,6 +25,9 @@ async function run() {
   assert.equal(initialState.settings.startHour, "09:00");
   assert.equal(initialState.appointments.length, 0);
   assert.equal(initialState.reminders.length, 0);
+  assert.equal(initialState.clients.length, 0);
+  assert.equal(initialState.cases.length, 0);
+  assert.equal(initialState.paymentRequests.length, 0);
   assert.equal(initialState.cashTransactions.length, 0);
   assert.equal(initialState.monthlyClosures.length, 0);
   assert.equal(initialState.meta.databaseReady, true);
@@ -52,6 +55,10 @@ async function run() {
     },
   });
   assert.equal(appointment.clientName, "Cliente Test");
+
+  const stateAfterAppointment = await request("/api/state");
+  assert.equal(stateAfterAppointment.clients.length, 1);
+  assert.equal(stateAfterAppointment.clients[0].name, "Cliente Test");
 
   const duplicate = await fetch(`${BASE_URL}/api/appointments`, {
     method: "POST",
@@ -119,6 +126,80 @@ async function run() {
 
   await request(`/api/reminders/${reminder.id}`, { method: "DELETE", noJson: true });
 
+  const client = await request("/api/clients", {
+    method: "POST",
+    body: {
+      name: "Cliente Tramite",
+      phone: "099 222 333",
+      email: "tramite@test.com",
+      document: "87654321",
+      address: "Montevideo",
+      notes: "Cliente para prueba integral",
+    },
+  });
+  assert.equal(client.name, "Cliente Tramite");
+
+  const updatedClient = await request(`/api/clients/${client.id}`, {
+    method: "PATCH",
+    body: { notes: "Actualizado" },
+  });
+  assert.equal(updatedClient.notes, "Actualizado");
+
+  const notarialCase = await request("/api/cases", {
+    method: "POST",
+    body: {
+      clientId: client.id,
+      clientName: client.name,
+      serviceId: "compraventa",
+      title: "Compraventa de prueba",
+      status: "waiting_documents",
+      dueDate: "2030-01-20",
+      amount: 15000,
+      notes: "Tramite automatizado",
+    },
+  });
+  assert.equal(notarialCase.status, "waiting_documents");
+
+  const stateWithCase = await request("/api/state");
+  const documents = stateWithCase.caseDocuments.filter((document) => document.caseId === notarialCase.id);
+  assert.ok(documents.length >= 3);
+
+  const receivedDocument = await request(`/api/case-documents/${documents[0].id}`, {
+    method: "PATCH",
+    body: { status: "received" },
+  });
+  assert.equal(receivedDocument.status, "received");
+
+  const readyCase = await request(`/api/cases/${notarialCase.id}`, {
+    method: "PATCH",
+    body: { status: "ready_to_sign" },
+  });
+  assert.equal(readyCase.status, "ready_to_sign");
+
+  const paymentRequest = await request("/api/payment-requests", {
+    method: "POST",
+    body: {
+      clientId: client.id,
+      caseId: notarialCase.id,
+      clientName: client.name,
+      concept: "Saldo de honorarios",
+      dueDate: "2030-01-25",
+      amount: 5000,
+      status: "pending",
+    },
+  });
+  assert.equal(paymentRequest.status, "pending");
+
+  const paidRequest = await request(`/api/payment-requests/${paymentRequest.id}`, {
+    method: "PATCH",
+    body: { status: "paid" },
+  });
+  assert.equal(paidRequest.status, "paid");
+
+  await request(`/api/payment-requests/${paymentRequest.id}`, { method: "DELETE", noJson: true });
+  await request(`/api/cases/${notarialCase.id}`, { method: "DELETE", noJson: true });
+  await request(`/api/clients/${client.id}`, { method: "DELETE", noJson: true });
+
   const income = await request("/api/cash-transactions", {
     method: "POST",
     body: {
@@ -175,10 +256,12 @@ async function run() {
   const finalState = await request("/api/state");
   assert.equal(finalState.appointments.length, 0);
   assert.equal(finalState.reminders.length, 0);
+  assert.equal(finalState.cases.length, 0);
+  assert.equal(finalState.paymentRequests.length, 0);
   assert.equal(finalState.cashTransactions.length, 0);
   assert.equal(finalState.monthlyClosures.length, 0);
 
-  console.log("OK - pruebas completas de agenda, caja, cierres, dashboards, API, base, recordatorios y seguridad estatica.");
+  console.log("OK - pruebas completas de agenda, clientes, tramites, documentos, pagos, caja, cierres, dashboards, API, base, recordatorios y seguridad estatica.");
 }
 
 async function waitForServer() {

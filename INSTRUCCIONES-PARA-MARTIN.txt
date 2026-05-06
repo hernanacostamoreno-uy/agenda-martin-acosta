@@ -65,12 +65,34 @@ Sirve para pagos de firmas, certificaciones, escrituras, consultas, anticipos, t
 
 Tambien se puede crear un cierre mensual con ingresos, egresos, saldo y cantidad de movimientos.
 
-9. Dashboard
+Tambien se pueden registrar pagos pendientes con vencimiento y marcarlos como pagados.
+
+9. Clientes
+
+En la pestaña Clientes se guardan fichas de clientes con nombre, documento, telefono, email, direccion y observaciones.
+Cuando se crea una cita, la app crea o actualiza una ficha basica del cliente.
+
+10. Tramites
+
+En la pestaña Tramites se puede seguir cada trabajo notarial.
+Se puede indicar estado, fecha limite, honorarios estimados y documentos pendientes.
+Los documentos se marcan como pendientes o recibidos.
+
+11. Plantillas
+
+En la pestaña Plantillas se generan mensajes listos para copiar:
+confirmacion de cita, documentacion pendiente, pago pendiente, tramite listo para firma y reprogramacion.
+
+12. Seguridad
+
+En Horarios, dentro de Seguridad local, se puede configurar un PIN de apertura y bloqueo automatico por inactividad.
+
+13. Dashboard
 
 En la pestaña Dashboard se ven indicadores del estudio:
-saldo mensual, citas por tramite, estados de agenda, proximas citas y recordatorios activos.
+saldo mensual, citas por tramite, estados de agenda, proximas citas, tramites activos, pagos pendientes y recordatorios activos.
 
-10. Cerrar la agenda
+14. Cerrar la agenda
 
 Cerrar la ventana de la aplicacion.
 El motor local se apaga solo.

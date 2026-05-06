@@ -69,6 +69,39 @@ La pestaña `Caja` permite cargar ingresos y gastos del estudio:
 
 Los movimientos y cierres quedan guardados en la misma base SQLite local.
 
+## Clientes
+
+La pestaña `Clientes` permite mantener fichas completas:
+
+- Nombre, documento, telefono, email y direccion.
+- Observaciones internas.
+- Historial operativo resumido de citas y pagos asociados.
+- Busqueda rapida por nombre, documento, telefono o email.
+
+Cuando se crea una cita, la app tambien crea o actualiza automaticamente una ficha basica del cliente.
+
+## Tramites y documentos
+
+La pestaña `Tramites` permite seguir trabajos notariales completos:
+
+- Cliente asociado.
+- Tipo de tramite.
+- Estado: iniciado, esperando documentos, en redaccion, listo para firma o finalizado.
+- Fecha limite y honorarios estimados.
+- Checklist automatico de documentos segun el tipo de tramite.
+
+Cada documento se puede marcar como pendiente o recibido.
+
+## Pagos pendientes
+
+Dentro de `Caja` se pueden registrar cobros esperados:
+
+- Cliente.
+- Concepto.
+- Fecha de vencimiento.
+- Importe.
+- Estado pendiente, pagado o cancelado.
+
 ## Dashboard
 
 La pestaña `Dashboard` muestra indicadores utiles para el estudio:
@@ -77,12 +110,30 @@ La pestaña `Dashboard` muestra indicadores utiles para el estudio:
 - Citas por tramite.
 - Estados de agenda: pendientes, confirmadas y canceladas.
 - Proximas citas y recordatorios activos.
+- Tramites activos y pagos pendientes.
+
+## Plantillas
+
+La pestaña `Plantillas` genera mensajes listos para copiar:
+
+- Confirmacion de cita.
+- Documentacion pendiente.
+- Pago pendiente.
+- Tramite listo para firma.
+- Reprogramacion de cita.
+
+Tambien incluye un asistente de gestion con alertas sobre citas pendientes, pagos vencidos, documentacion faltante y saldo de caja.
 
 ## Mejoras incluidas
 
 - Logo propio para la aplicacion y accesos directos.
 - Busqueda por cliente, telefono, documento, tramite u observaciones.
 - Caja administrativa con ingresos, gastos y cierres mensuales.
+- Fichas de clientes.
+- Gestion de tramites y documentos pendientes.
+- Pagos pendientes.
+- Plantillas de mensajes.
+- PIN local y bloqueo automatico opcional.
 - Dashboard de gestion notarial.
 - Panel de seguridad de datos con ubicacion de base y backups.
 - Boton de backup manual dentro de la app.

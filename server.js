@@ -34,6 +34,8 @@ const SERVICE_IDS = new Set(["compraventa", "certificacion", "poder", "sociedade
 const VALID_DURATIONS = new Set([30, 45, 60]);
 const VALID_STATUSES = new Set(["pending", "confirmed", "cancelled"]);
 const VALID_CASH_TYPES = new Set(["income", "expense"]);
+const VALID_CASE_STATUSES = new Set(["started", "waiting_documents", "drafting", "ready_to_sign", "finished"]);
+const VALID_PAYMENT_STATUSES = new Set(["pending", "paid", "cancelled"]);
 const STATIC_FILES = new Set([
   "index.html",
   "styles.css",
@@ -120,6 +122,55 @@ function initDb() {
       notified_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS clients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      document TEXT NOT NULL DEFAULT '',
+      address TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS notarial_cases (
+      id TEXT PRIMARY KEY,
+      client_id TEXT,
+      client_name TEXT NOT NULL,
+      service_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'started',
+      due_date TEXT NOT NULL DEFAULT '',
+      amount_cents INTEGER NOT NULL DEFAULT 0,
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS case_documents (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_requests (
+      id TEXT PRIMARY KEY,
+      client_id TEXT,
+      case_id TEXT,
+      client_name TEXT NOT NULL,
+      concept TEXT NOT NULL,
+      due_date TEXT NOT NULL,
+      amount_cents INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      paid_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS cash_transactions (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
@@ -149,6 +200,18 @@ function initDb() {
       ON appointments(date, time)
       WHERE status != 'cancelled';
 
+    CREATE INDEX IF NOT EXISTS clients_search
+      ON clients(name, document, phone);
+
+    CREATE INDEX IF NOT EXISTS notarial_cases_status
+      ON notarial_cases(status, due_date);
+
+    CREATE INDEX IF NOT EXISTS case_documents_case
+      ON case_documents(case_id, status);
+
+    CREATE INDEX IF NOT EXISTS payment_requests_status
+      ON payment_requests(status, due_date);
+
     CREATE INDEX IF NOT EXISTS cash_transactions_date
       ON cash_transactions(date, type);
 
@@ -170,6 +233,10 @@ async function handleApi(request, response, url) {
       settings: getSettings(),
       appointments: listAppointments(),
       reminders: listReminders(),
+      clients: listClients(),
+      cases: listCases(),
+      caseDocuments: listCaseDocuments(),
+      paymentRequests: listPaymentRequests(),
       cashTransactions: listCashTransactions(),
       monthlyClosures: listMonthlyClosures(),
       meta: getMeta(),
@@ -218,6 +285,63 @@ async function handleApi(request, response, url) {
 
   if (request.method === "POST" && url.pathname === "/api/reminders") {
     sendJson(response, createReminder(await readJson(request)), 201);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/clients") {
+    sendJson(response, createClient(await readJson(request)), 201);
+    return;
+  }
+
+  if (request.method === "PATCH" && parts[0] === "api" && parts[1] === "clients" && parts[2]) {
+    sendJson(response, updateClient(parts[2], await readJson(request)));
+    return;
+  }
+
+  if (request.method === "DELETE" && parts[0] === "api" && parts[1] === "clients" && parts[2]) {
+    db.prepare("DELETE FROM clients WHERE id = ?").run(parts[2]);
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/cases") {
+    sendJson(response, createCase(await readJson(request)), 201);
+    return;
+  }
+
+  if (request.method === "PATCH" && parts[0] === "api" && parts[1] === "cases" && parts[2]) {
+    sendJson(response, updateCase(parts[2], await readJson(request)));
+    return;
+  }
+
+  if (request.method === "DELETE" && parts[0] === "api" && parts[1] === "cases" && parts[2]) {
+    db.prepare("DELETE FROM case_documents WHERE case_id = ?").run(parts[2]);
+    db.prepare("DELETE FROM notarial_cases WHERE id = ?").run(parts[2]);
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
+  if (request.method === "PATCH" && parts[0] === "api" && parts[1] === "case-documents" && parts[2]) {
+    sendJson(response, updateCaseDocument(parts[2], await readJson(request)));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/payment-requests") {
+    sendJson(response, createPaymentRequest(await readJson(request)), 201);
+    return;
+  }
+
+  if (request.method === "PATCH" && parts[0] === "api" && parts[1] === "payment-requests" && parts[2]) {
+    sendJson(response, updatePaymentRequest(parts[2], await readJson(request)));
+    return;
+  }
+
+  if (request.method === "DELETE" && parts[0] === "api" && parts[1] === "payment-requests" && parts[2]) {
+    db.prepare("DELETE FROM payment_requests WHERE id = ?").run(parts[2]);
+    response.writeHead(204);
+    response.end();
     return;
   }
 
@@ -274,6 +398,10 @@ async function handleApi(request, response, url) {
       settings: getSettings(),
       appointments: listAppointments(),
       reminders: listReminders(),
+      clients: listClients(),
+      cases: listCases(),
+      caseDocuments: listCaseDocuments(),
+      paymentRequests: listPaymentRequests(),
       cashTransactions: listCashTransactions(),
       monthlyClosures: listMonthlyClosures(),
       meta: getMeta(),
@@ -346,6 +474,64 @@ function listReminders() {
     .map(reminderFromRow);
 }
 
+function listClients() {
+  return db
+    .prepare(
+      `SELECT id, name, phone, email, document, address, notes, created_at, updated_at
+       FROM clients
+       ORDER BY name COLLATE NOCASE`,
+    )
+    .all()
+    .map(clientFromRow);
+}
+
+function listCases() {
+  return db
+    .prepare(
+      `SELECT id, client_id, client_name, service_id, title, status, due_date,
+              amount_cents, notes, created_at, updated_at
+       FROM notarial_cases
+       ORDER BY
+         CASE status
+           WHEN 'waiting_documents' THEN 1
+           WHEN 'drafting' THEN 2
+           WHEN 'ready_to_sign' THEN 3
+           WHEN 'started' THEN 4
+           ELSE 5
+         END,
+         due_date,
+         created_at DESC`,
+    )
+    .all()
+    .map(caseFromRow);
+}
+
+function listCaseDocuments() {
+  return db
+    .prepare(
+      `SELECT id, case_id, label, status, notes, created_at
+       FROM case_documents
+       ORDER BY created_at, label COLLATE NOCASE`,
+    )
+    .all()
+    .map(caseDocumentFromRow);
+}
+
+function listPaymentRequests() {
+  return db
+    .prepare(
+      `SELECT id, client_id, case_id, client_name, concept, due_date,
+              amount_cents, status, notes, created_at, paid_at
+       FROM payment_requests
+       ORDER BY
+         CASE status WHEN 'pending' THEN 1 WHEN 'paid' THEN 2 ELSE 3 END,
+         due_date,
+         created_at DESC`,
+    )
+    .all()
+    .map(paymentRequestFromRow);
+}
+
 function listCashTransactions() {
   return db
     .prepare(
@@ -383,6 +569,7 @@ function createAppointment(payload) {
 
   const id = randomUUID();
   const createdAt = new Date().toISOString();
+  upsertClientFromAppointment(appointment);
 
   try {
     db.prepare(
@@ -412,6 +599,155 @@ function createAppointment(payload) {
   }
 
   return appointmentFromRow(db.prepare("SELECT * FROM appointments WHERE id = ?").get(id));
+}
+
+function createClient(payload) {
+  const client = normalizeClientPayload(payload);
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO clients (id, name, phone, email, document, address, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, client.name, client.phone, client.email, client.document, client.address, client.notes, now, now);
+  return clientFromRow(db.prepare("SELECT * FROM clients WHERE id = ?").get(id));
+}
+
+function updateClient(id, payload) {
+  const current = db.prepare("SELECT * FROM clients WHERE id = ?").get(id);
+  if (!current) throw httpError("Cliente no encontrado", 404);
+  const next = normalizeClientPayload({ ...clientFromRow(current), ...payload });
+  db.prepare(
+    `UPDATE clients
+     SET name = ?, phone = ?, email = ?, document = ?, address = ?, notes = ?, updated_at = ?
+     WHERE id = ?`,
+  ).run(next.name, next.phone, next.email, next.document, next.address, next.notes, new Date().toISOString(), id);
+  return clientFromRow(db.prepare("SELECT * FROM clients WHERE id = ?").get(id));
+}
+
+function createCase(payload) {
+  const item = normalizeCasePayload(payload);
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO notarial_cases (
+      id, client_id, client_name, service_id, title, status, due_date,
+      amount_cents, notes, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    item.clientId,
+    item.clientName,
+    item.serviceId,
+    item.title,
+    item.status,
+    item.dueDate,
+    item.amountCents,
+    item.notes,
+    now,
+    now,
+  );
+
+  const documents = Array.isArray(payload.documents) && payload.documents.length
+    ? payload.documents
+    : defaultDocumentsForService(item.serviceId);
+  const insertDocument = db.prepare(
+    "INSERT INTO case_documents (id, case_id, label, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+  );
+  documents.forEach((document) => {
+    const label = limitText(typeof document === "string" ? document : document.label, 90);
+    if (!label) return;
+    insertDocument.run(randomUUID(), id, label, "pending", "", now);
+  });
+
+  return caseFromRow(db.prepare("SELECT * FROM notarial_cases WHERE id = ?").get(id));
+}
+
+function updateCase(id, payload) {
+  const current = db.prepare("SELECT * FROM notarial_cases WHERE id = ?").get(id);
+  if (!current) throw httpError("Tramite no encontrado", 404);
+  const currentCase = caseFromRow(current);
+  const item = normalizeCasePayload({ ...currentCase, ...payload });
+  db.prepare(
+    `UPDATE notarial_cases
+     SET client_id = ?, client_name = ?, service_id = ?, title = ?, status = ?,
+         due_date = ?, amount_cents = ?, notes = ?, updated_at = ?
+     WHERE id = ?`,
+  ).run(
+    item.clientId,
+    item.clientName,
+    item.serviceId,
+    item.title,
+    item.status,
+    item.dueDate,
+    item.amountCents,
+    item.notes,
+    new Date().toISOString(),
+    id,
+  );
+  return caseFromRow(db.prepare("SELECT * FROM notarial_cases WHERE id = ?").get(id));
+}
+
+function updateCaseDocument(id, payload) {
+  const current = db.prepare("SELECT * FROM case_documents WHERE id = ?").get(id);
+  if (!current) throw httpError("Documento no encontrado", 404);
+  const status = String(payload.status || current.status).trim();
+  if (!["pending", "received", "not_needed"].includes(status)) throw httpError("Estado de documento invalido", 400);
+  const notes = Object.prototype.hasOwnProperty.call(payload, "notes") ? limitText(payload.notes, 300) : current.notes;
+  db.prepare("UPDATE case_documents SET status = ?, notes = ? WHERE id = ?").run(status, notes, id);
+  return caseDocumentFromRow(db.prepare("SELECT * FROM case_documents WHERE id = ?").get(id));
+}
+
+function createPaymentRequest(payload) {
+  const payment = normalizePaymentRequestPayload(payload);
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO payment_requests (
+      id, client_id, case_id, client_name, concept, due_date,
+      amount_cents, status, notes, created_at, paid_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    payment.clientId,
+    payment.caseId,
+    payment.clientName,
+    payment.concept,
+    payment.dueDate,
+    payment.amountCents,
+    payment.status,
+    payment.notes,
+    createdAt,
+    null,
+  );
+  return paymentRequestFromRow(db.prepare("SELECT * FROM payment_requests WHERE id = ?").get(id));
+}
+
+function updatePaymentRequest(id, payload) {
+  const current = db.prepare("SELECT * FROM payment_requests WHERE id = ?").get(id);
+  if (!current) throw httpError("Pago pendiente no encontrado", 404);
+  const currentPayment = paymentRequestFromRow(current);
+  const payment = normalizePaymentRequestPayload({ ...currentPayment, ...payload });
+  const paidAt = payment.status === "paid" ? payload.paidAt || current.paid_at || new Date().toISOString() : null;
+
+  db.prepare(
+    `UPDATE payment_requests
+     SET client_id = ?, case_id = ?, client_name = ?, concept = ?, due_date = ?,
+         amount_cents = ?, status = ?, notes = ?, paid_at = ?
+     WHERE id = ?`,
+  ).run(
+    payment.clientId,
+    payment.caseId,
+    payment.clientName,
+    payment.concept,
+    payment.dueDate,
+    payment.amountCents,
+    payment.status,
+    payment.notes,
+    paidAt,
+    id,
+  );
+
+  return paymentRequestFromRow(db.prepare("SELECT * FROM payment_requests WHERE id = ?").get(id));
 }
 
 function updateAppointmentStatus(id, status) {
@@ -617,6 +953,63 @@ function reminderFromRow(row) {
   };
 }
 
+function clientFromRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    document: row.document,
+    address: row.address,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function caseFromRow(row) {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    clientName: row.client_name,
+    serviceId: row.service_id,
+    title: row.title,
+    status: row.status,
+    dueDate: row.due_date,
+    amount: centsToAmount(row.amount_cents),
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function caseDocumentFromRow(row) {
+  return {
+    id: row.id,
+    caseId: row.case_id,
+    label: row.label,
+    status: row.status,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
+
+function paymentRequestFromRow(row) {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    caseId: row.case_id,
+    clientName: row.client_name,
+    concept: row.concept,
+    dueDate: row.due_date,
+    amount: centsToAmount(row.amount_cents),
+    status: row.status,
+    notes: row.notes,
+    createdAt: row.created_at,
+    paidAt: row.paid_at,
+  };
+}
+
 function cashTransactionFromRow(row) {
   return {
     id: row.id,
@@ -686,6 +1079,68 @@ function normalizeReminderPayload(payload) {
   };
   validateReminder(reminder);
   return reminder;
+}
+
+function normalizeClientPayload(payload) {
+  const client = {
+    name: limitText(payload.name || payload.clientName, 100),
+    phone: limitText(payload.phone || payload.clientPhone, 50),
+    email: limitText(payload.email || payload.clientEmail, 120),
+    document: limitText(payload.document || payload.clientDocument, 40),
+    address: limitText(payload.address, 160),
+    notes: limitText(payload.notes, 900),
+  };
+  requireText(client.name, "Nombre de cliente requerido");
+  if (client.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(client.email)) {
+    throw httpError("Email de cliente invalido", 400);
+  }
+  return client;
+}
+
+function normalizeCasePayload(payload) {
+  const serviceId = String(payload.serviceId || "consulta").trim();
+  const status = String(payload.status || "started").trim();
+  const dueDate = String(payload.dueDate || "").trim();
+  const amount = Number(payload.amount || 0);
+  const item = {
+    clientId: limitText(payload.clientId, 80) || null,
+    clientName: limitText(payload.clientName, 100),
+    serviceId,
+    title: limitText(payload.title, 140),
+    status,
+    dueDate,
+    amountCents: Math.round((Number.isFinite(amount) && amount > 0 ? amount : 0) * 100),
+    notes: limitText(payload.notes, 900),
+  };
+
+  requireText(item.clientName, "Cliente del tramite requerido");
+  requireText(item.title, "Titulo del tramite requerido");
+  if (!SERVICE_IDS.has(item.serviceId)) throw httpError("Tipo de tramite invalido", 400);
+  if (!VALID_CASE_STATUSES.has(item.status)) throw httpError("Estado de tramite invalido", 400);
+  if (item.dueDate) validateDate(item.dueDate);
+  return item;
+}
+
+function normalizePaymentRequestPayload(payload) {
+  const amount = Number(payload.amount);
+  const status = String(payload.status || "pending").trim();
+  const payment = {
+    clientId: limitText(payload.clientId, 80) || null,
+    caseId: limitText(payload.caseId, 80) || null,
+    clientName: limitText(payload.clientName, 100),
+    concept: limitText(payload.concept, 140),
+    dueDate: String(payload.dueDate || "").trim(),
+    amountCents: Math.round(amount * 100),
+    status,
+    notes: limitText(payload.notes, 700),
+  };
+
+  requireText(payment.clientName, "Cliente del pago requerido");
+  requireText(payment.concept, "Concepto del pago requerido");
+  validateDate(payment.dueDate);
+  if (!Number.isFinite(amount) || amount <= 0) throw httpError("Importe de pago invalido", 400);
+  if (!VALID_PAYMENT_STATUSES.has(payment.status)) throw httpError("Estado de pago invalido", 400);
+  return payment;
 }
 
 function normalizeCashTransactionPayload(payload) {
@@ -772,6 +1227,57 @@ function getMonthRange(month) {
   const next = new Date(Date.UTC(year, monthNumber, 1));
   const end = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-01`;
   return { start, end };
+}
+
+function upsertClientFromAppointment(appointment) {
+  const client = normalizeClientPayload({
+    name: appointment.clientName,
+    phone: appointment.clientPhone,
+    email: appointment.clientEmail,
+    document: appointment.clientDocument,
+    notes: appointment.notes,
+  });
+  const now = new Date().toISOString();
+  const existing = client.document
+    ? db.prepare("SELECT * FROM clients WHERE document = ?").get(client.document)
+    : db.prepare("SELECT * FROM clients WHERE name = ? AND phone = ?").get(client.name, client.phone);
+
+  if (existing) {
+    db.prepare(
+      `UPDATE clients
+       SET name = ?, phone = ?, email = ?, document = ?, notes = ?, updated_at = ?
+       WHERE id = ?`,
+    ).run(
+      client.name,
+      client.phone || existing.phone,
+      client.email || existing.email,
+      client.document || existing.document,
+      client.notes || existing.notes,
+      now,
+      existing.id,
+    );
+    return existing.id;
+  }
+
+  const id = randomUUID();
+  db.prepare(
+    `INSERT INTO clients (id, name, phone, email, document, address, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, client.name, client.phone, client.email, client.document, "", client.notes, now, now);
+  return id;
+}
+
+function defaultDocumentsForService(serviceId) {
+  const common = ["Cedula vigente", "Datos de contacto", "Comprobante de pago"];
+  const byService = {
+    compraventa: ["Datos del inmueble", "Titulo antecedente", "Certificados registrales", "Borrador de escritura"],
+    certificacion: ["Documento a firmar", "Cedula del firmante"],
+    poder: ["Datos del poderdante", "Datos del apoderado", "Alcance del poder"],
+    sociedades: ["Datos de socios", "Estatuto o contrato", "Acta o resolucion"],
+    sucesiones: ["Partida de defuncion", "Partidas familiares", "Certificado de actos personales"],
+    consulta: ["Resumen del asunto", "Documentacion relacionada"],
+  };
+  return [...common, ...(byService[serviceId] || byService.consulta)];
 }
 
 function isBlocked(date, time) {

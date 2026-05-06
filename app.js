@@ -15,6 +15,53 @@ const cashCategories = {
   expense: ["Tasas y timbres", "Alquiler", "Servicios", "Insumos", "Traslados", "Honorarios externos", "Impuestos", "Otro gasto"],
 };
 
+const caseStatusLabels = {
+  started: "Iniciado",
+  waiting_documents: "Esperando documentos",
+  drafting: "En redaccion",
+  ready_to_sign: "Listo para firma",
+  finished: "Finalizado",
+};
+
+const paymentStatusLabels = {
+  pending: "Pendiente",
+  paid: "Pagado",
+  cancelled: "Cancelado",
+};
+
+const messageTemplates = [
+  {
+    id: "appointment",
+    title: "Confirmacion de cita",
+    build: (client) =>
+      `Hola ${client.name}. Te confirmamos tu cita con el Escribano Martin Acosta. Por favor trae documento vigente y la documentacion relacionada al tramite.`,
+  },
+  {
+    id: "documents",
+    title: "Documentacion pendiente",
+    build: (client) =>
+      `Hola ${client.name}. Para avanzar con el tramite necesitamos que nos envies o acerques la documentacion pendiente. Quedamos atentos.`,
+  },
+  {
+    id: "payment",
+    title: "Pago pendiente",
+    build: (client) =>
+      `Hola ${client.name}. Te recordamos que queda un pago pendiente asociado al tramite. Cuando puedas, envianos el comprobante para dejarlo registrado.`,
+  },
+  {
+    id: "ready",
+    title: "Tramite listo para firma",
+    build: (client) =>
+      `Hola ${client.name}. Tu tramite ya esta listo para firma. Coordinamos dia y hora para pasar por el estudio.`,
+  },
+  {
+    id: "reschedule",
+    title: "Reprogramar cita",
+    build: (client) =>
+      `Hola ${client.name}. Necesitamos reprogramar la cita. Decinos que disponibilidad tenes y buscamos un nuevo horario.`,
+  },
+];
+
 const defaultSettings = {
   startHour: "09:00",
   endHour: "17:00",
@@ -28,6 +75,10 @@ let state = {
   settings: { ...defaultSettings },
   appointments: [],
   reminders: [],
+  clients: [],
+  cases: [],
+  caseDocuments: [],
+  paymentRequests: [],
   cashTransactions: [],
   monthlyClosures: [],
   meta: {},
@@ -38,6 +89,9 @@ let selectedAgendaDate = "";
 let formDirty = false;
 let isSaving = false;
 const notifiedThisSession = new Set();
+let editingClientId = null;
+let editingCaseId = null;
+let lastActivityAt = Date.now();
 
 const elements = {
   navTabs: document.querySelectorAll(".nav-tab"),
@@ -99,6 +153,37 @@ const elements = {
   dataPath: document.getElementById("dataPath"),
   backupPath: document.getElementById("backupPath"),
   backupNow: document.getElementById("backupNow"),
+  lockScreen: document.getElementById("lockScreen"),
+  unlockPin: document.getElementById("unlockPin"),
+  unlockApp: document.getElementById("unlockApp"),
+  skipPinSetup: document.getElementById("skipPinSetup"),
+  lockMessage: document.getElementById("lockMessage"),
+  clientForm: document.getElementById("clientForm"),
+  clientFullName: document.getElementById("clientFullName"),
+  clientDoc: document.getElementById("clientDoc"),
+  clientTel: document.getElementById("clientTel"),
+  clientMail: document.getElementById("clientMail"),
+  clientAddress: document.getElementById("clientAddress"),
+  clientNotes: document.getElementById("clientNotes"),
+  saveClient: document.getElementById("saveClient"),
+  clearClientForm: document.getElementById("clearClientForm"),
+  clientMessage: document.getElementById("clientMessage"),
+  clientSearch: document.getElementById("clientSearch"),
+  clientList: document.getElementById("clientList"),
+  caseForm: document.getElementById("caseForm"),
+  caseClient: document.getElementById("caseClient"),
+  caseService: document.getElementById("caseService"),
+  caseStatus: document.getElementById("caseStatus"),
+  caseDueDate: document.getElementById("caseDueDate"),
+  caseAmount: document.getElementById("caseAmount"),
+  caseTitle: document.getElementById("caseTitle"),
+  caseNotes: document.getElementById("caseNotes"),
+  saveCase: document.getElementById("saveCase"),
+  clearCaseForm: document.getElementById("clearCaseForm"),
+  caseMessage: document.getElementById("caseMessage"),
+  caseFilterStatus: document.getElementById("caseFilterStatus"),
+  caseSearch: document.getElementById("caseSearch"),
+  caseList: document.getElementById("caseList"),
   cashForm: document.getElementById("cashForm"),
   cashType: document.getElementById("cashType"),
   cashDate: document.getElementById("cashDate"),
@@ -117,12 +202,33 @@ const elements = {
   cashTransactionList: document.getElementById("cashTransactionList"),
   closeCashMonth: document.getElementById("closeCashMonth"),
   closureList: document.getElementById("closureList"),
+  paymentForm: document.getElementById("paymentForm"),
+  paymentClient: document.getElementById("paymentClient"),
+  paymentDueDate: document.getElementById("paymentDueDate"),
+  paymentAmount: document.getElementById("paymentAmount"),
+  paymentConcept: document.getElementById("paymentConcept"),
+  savePaymentRequest: document.getElementById("savePaymentRequest"),
+  paymentRequestList: document.getElementById("paymentRequestList"),
   dashboardMonth: document.getElementById("dashboardMonth"),
   dashboardKpis: document.getElementById("dashboardKpis"),
   cashFlowChart: document.getElementById("cashFlowChart"),
   serviceChart: document.getElementById("serviceChart"),
   statusDashboard: document.getElementById("statusDashboard"),
   dashboardInsights: document.getElementById("dashboardInsights"),
+  templateType: document.getElementById("templateType"),
+  templateClient: document.getElementById("templateClient"),
+  templateOutput: document.getElementById("templateOutput"),
+  copyTemplate: document.getElementById("copyTemplate"),
+  refreshTemplate: document.getElementById("refreshTemplate"),
+  templateMessage: document.getElementById("templateMessage"),
+  assistantInsights: document.getElementById("assistantInsights"),
+  copyBackupPath: document.getElementById("copyBackupPath"),
+  exportFullCsv: document.getElementById("exportFullCsv"),
+  securityPin: document.getElementById("securityPin"),
+  lockMinutes: document.getElementById("lockMinutes"),
+  saveSecurity: document.getElementById("saveSecurity"),
+  lockNow: document.getElementById("lockNow"),
+  securityMessage: document.getElementById("securityMessage"),
 };
 
 init();
@@ -137,8 +243,11 @@ async function init() {
   elements.reminderDueAt.value = toDateTimeInput(addMinutes(new Date(), 60));
   elements.cashDate.value = today;
   elements.cashMonth.value = toMonthInput(new Date());
+  elements.paymentDueDate.value = today;
   elements.dashboardMonth.value = toMonthInput(new Date());
   renderCashCategories();
+  renderStaticSelects();
+  hydrateSecurity();
 
   bindEvents();
   renderServices();
@@ -148,6 +257,7 @@ async function init() {
   hydrateSettings();
   renderAll();
   startReminderWatcher();
+  startSecurityWatcher();
 }
 
 async function loadStateFromDatabase() {
@@ -159,6 +269,10 @@ async function loadStateFromDatabase() {
       settings: { ...defaultSettings },
       appointments: [],
       reminders: [],
+      clients: [],
+      cases: [],
+      caseDocuments: [],
+      paymentRequests: [],
       cashTransactions: [],
       monthlyClosures: [],
       meta: {},
@@ -190,6 +304,10 @@ function normalizeState(data) {
     settings: { ...defaultSettings, ...(data.settings || {}) },
     appointments: Array.isArray(data.appointments) ? data.appointments : [],
     reminders: Array.isArray(data.reminders) ? data.reminders : [],
+    clients: Array.isArray(data.clients) ? data.clients : [],
+    cases: Array.isArray(data.cases) ? data.cases : [],
+    caseDocuments: Array.isArray(data.caseDocuments) ? data.caseDocuments : [],
+    paymentRequests: Array.isArray(data.paymentRequests) ? data.paymentRequests : [],
     cashTransactions: Array.isArray(data.cashTransactions) ? data.cashTransactions : [],
     monthlyClosures: Array.isArray(data.monthlyClosures) ? data.monthlyClosures : [],
     meta: data.meta || {},
@@ -255,6 +373,32 @@ function bindEvents() {
     });
   });
   [
+    elements.clientFullName,
+    elements.clientDoc,
+    elements.clientTel,
+    elements.clientMail,
+    elements.clientAddress,
+    elements.clientNotes,
+    elements.caseClient,
+    elements.caseService,
+    elements.caseStatus,
+    elements.caseDueDate,
+    elements.caseAmount,
+    elements.caseTitle,
+    elements.caseNotes,
+    elements.paymentClient,
+    elements.paymentDueDate,
+    elements.paymentAmount,
+    elements.paymentConcept,
+  ].forEach((input) => {
+    input.addEventListener("input", () => {
+      formDirty = true;
+    });
+    input.addEventListener("change", () => {
+      formDirty = true;
+    });
+  });
+  [
     elements.cashType,
     elements.cashDate,
     elements.cashAmount,
@@ -299,6 +443,13 @@ function bindEvents() {
   elements.copyReminder.addEventListener("click", copyReminderText);
   elements.enableNotifications.addEventListener("click", requestNotificationPermission);
   elements.reminderForm.addEventListener("submit", submitReminder);
+  elements.clientForm.addEventListener("submit", submitClient);
+  elements.clearClientForm.addEventListener("click", clearClientForm);
+  elements.clientSearch.addEventListener("input", renderAll);
+  elements.caseForm.addEventListener("submit", submitCase);
+  elements.clearCaseForm.addEventListener("click", clearCaseForm);
+  elements.caseFilterStatus.addEventListener("change", renderAll);
+  elements.caseSearch.addEventListener("input", renderAll);
   elements.cashForm.addEventListener("submit", submitCashTransaction);
   elements.clearCashForm.addEventListener("click", clearCashForm);
   elements.cashMonth.addEventListener("change", () => {
@@ -307,10 +458,32 @@ function bindEvents() {
   });
   elements.cashFilterType.addEventListener("change", renderAll);
   elements.closeCashMonth.addEventListener("click", closeCashMonth);
+  elements.paymentForm.addEventListener("submit", submitPaymentRequest);
   elements.dashboardMonth.addEventListener("change", renderAll);
+  elements.templateType.addEventListener("change", renderTemplate);
+  elements.templateClient.addEventListener("change", renderTemplate);
+  elements.refreshTemplate.addEventListener("click", renderTemplate);
+  elements.copyTemplate.addEventListener("click", copyTemplateText);
   elements.saveSettings.addEventListener("click", saveSettings);
   elements.addBlock.addEventListener("click", addBlockedSlot);
   elements.backupNow.addEventListener("click", createBackupNow);
+  elements.copyBackupPath.addEventListener("click", copyBackupPath);
+  elements.exportFullCsv.addEventListener("click", exportFullCsv);
+  elements.saveSecurity.addEventListener("click", saveSecuritySettings);
+  elements.lockNow.addEventListener("click", lockApp);
+  elements.unlockApp.addEventListener("click", unlockApp);
+  elements.skipPinSetup.addEventListener("click", () => {
+    localStorage.setItem("agenda-security-skip", "true");
+    elements.lockScreen.hidden = true;
+  });
+  elements.unlockPin.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") unlockApp();
+  });
+  ["click", "keydown", "mousemove", "input"].forEach((eventName) => {
+    window.addEventListener(eventName, () => {
+      lastActivityAt = Date.now();
+    });
+  });
   window.addEventListener("beforeunload", warnBeforeClose);
 }
 
@@ -318,8 +491,11 @@ function switchView(viewName) {
   const titles = {
     booking: "Nueva cita",
     agenda: "Agenda",
+    clients: "Clientes",
+    cases: "Tramites",
     cash: "Caja",
     dashboard: "Dashboard",
+    templates: "Plantillas",
     settings: "Horarios",
   };
   elements.navTabs.forEach((tab) => {
@@ -335,12 +511,18 @@ function renderAll() {
   renderWeekCalendar();
   renderAgenda();
   renderReminders();
+  renderClients();
+  renderCases();
+  renderPaymentRequests();
   renderBlockedSlots();
   renderStats();
   renderAgent();
   renderDataStatus();
   renderCash();
   renderDashboard();
+  renderTemplateSelectors();
+  renderTemplate();
+  renderAssistantInsights();
   updateNotificationButton();
 }
 
@@ -505,6 +687,11 @@ function clearBookingForm(options = {}) {
 function showMessage(text, type) {
   elements.formMessage.style.color = type === "error" ? "var(--rose)" : "var(--green)";
   elements.formMessage.textContent = text;
+}
+
+function setInlineMessage(element, text, type) {
+  element.style.color = type === "error" ? "var(--rose)" : "var(--green)";
+  element.textContent = text;
 }
 
 function renderWeekCalendar() {
@@ -973,6 +1160,270 @@ async function createBackupNow() {
   }
 }
 
+function renderStaticSelects() {
+  elements.caseService.innerHTML = services
+    .map((service) => `<option value="${service.id}">${escapeHtml(service.title)}</option>`)
+    .join("");
+  elements.templateType.innerHTML = messageTemplates
+    .map((template) => `<option value="${template.id}">${escapeHtml(template.title)}</option>`)
+    .join("");
+}
+
+function renderClientOptions() {
+  const options = [
+    `<option value="">Sin cliente seleccionado</option>`,
+    ...state.clients.map((client) => `<option value="${client.id}">${escapeHtml(client.name)}</option>`),
+  ].join("");
+  [elements.caseClient, elements.paymentClient, elements.templateClient].forEach((select) => {
+    const current = select.value;
+    select.innerHTML = options;
+    if ([...select.options].some((option) => option.value === current)) select.value = current;
+  });
+}
+
+async function submitClient(event) {
+  event.preventDefault();
+  const payload = {
+    name: clean(elements.clientFullName.value),
+    document: clean(elements.clientDoc.value),
+    phone: clean(elements.clientTel.value),
+    email: clean(elements.clientMail.value),
+    address: clean(elements.clientAddress.value),
+    notes: clean(elements.clientNotes.value),
+  };
+  if (!payload.name) {
+    setInlineMessage(elements.clientMessage, "Nombre de cliente requerido.", "error");
+    return;
+  }
+
+  try {
+    const path = editingClientId ? `/api/clients/${editingClientId}` : "/api/clients";
+    const method = editingClientId ? "PATCH" : "POST";
+    await api(path, { method, body: payload });
+    await loadStateFromDatabase();
+    clearClientForm();
+    setInlineMessage(elements.clientMessage, "Cliente guardado.", "success");
+    renderAll();
+  } catch (error) {
+    setInlineMessage(elements.clientMessage, `No pude guardar el cliente: ${error.message}`, "error");
+  }
+}
+
+function clearClientForm() {
+  editingClientId = null;
+  elements.clientForm.reset();
+  elements.saveClient.textContent = "Guardar cliente";
+  formDirty = false;
+}
+
+function renderClients() {
+  renderClientOptions();
+  const query = clean(elements.clientSearch.value).toLowerCase();
+  const clients = state.clients.filter((client) =>
+    [client.name, client.document, client.phone, client.email].join(" ").toLowerCase().includes(query),
+  );
+
+  if (!clients.length) {
+    elements.clientList.innerHTML = `<div class="empty-state">No hay clientes para mostrar.</div>`;
+    return;
+  }
+
+  elements.clientList.innerHTML = clients.map(renderClientCard).join("");
+  elements.clientList.querySelectorAll("[data-client-edit]").forEach((button) => {
+    button.addEventListener("click", () => editClient(button.dataset.clientEdit));
+  });
+  elements.clientList.querySelectorAll("[data-client-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteClient(button.dataset.clientDelete));
+  });
+}
+
+function renderClientCard(client) {
+  const clientAppointments = state.appointments.filter(
+    (appointment) =>
+      sameText(appointment.clientName, client.name) ||
+      (client.document && appointment.clientDocument === client.document),
+  ).length;
+  const clientPayments = state.paymentRequests.filter((payment) => payment.clientId === client.id).length;
+  return `
+    <article class="entity-card">
+      <div>
+        <strong>${escapeHtml(client.name)}</strong>
+        <span>${escapeHtml(client.document || "Sin documento")} - ${escapeHtml(client.phone || "Sin telefono")}</span>
+        <small>${escapeHtml(client.email || "Sin email")}</small>
+        <small>${clientAppointments} citas - ${clientPayments} pagos asociados</small>
+      </div>
+      <div class="card-actions">
+        <button class="small-action" type="button" data-client-edit="${client.id}">Editar</button>
+        <button class="small-action" type="button" data-client-delete="${client.id}">Eliminar</button>
+      </div>
+    </article>
+  `;
+}
+
+function editClient(id) {
+  const client = state.clients.find((item) => item.id === id);
+  if (!client) return;
+  editingClientId = id;
+  elements.clientFullName.value = client.name;
+  elements.clientDoc.value = client.document;
+  elements.clientTel.value = client.phone;
+  elements.clientMail.value = client.email;
+  elements.clientAddress.value = client.address;
+  elements.clientNotes.value = client.notes;
+  elements.saveClient.textContent = "Actualizar cliente";
+  switchView("clients");
+}
+
+async function deleteClient(id) {
+  try {
+    await api(`/api/clients/${id}`, { method: "DELETE" });
+    await loadStateFromDatabase();
+    renderAll();
+  } catch (error) {
+    setInlineMessage(elements.clientMessage, `No pude eliminar el cliente: ${error.message}`, "error");
+  }
+}
+
+async function submitCase(event) {
+  event.preventDefault();
+  const selectedClient = state.clients.find((client) => client.id === elements.caseClient.value);
+  const payload = {
+    clientId: selectedClient?.id || null,
+    clientName: selectedClient?.name || "Cliente sin ficha",
+    serviceId: elements.caseService.value,
+    status: elements.caseStatus.value,
+    dueDate: elements.caseDueDate.value,
+    amount: Number(elements.caseAmount.value || 0),
+    title: clean(elements.caseTitle.value),
+    notes: clean(elements.caseNotes.value),
+  };
+  if (!payload.title || !payload.clientName) {
+    setInlineMessage(elements.caseMessage, "Completa cliente y titulo.", "error");
+    return;
+  }
+
+  try {
+    const path = editingCaseId ? `/api/cases/${editingCaseId}` : "/api/cases";
+    const method = editingCaseId ? "PATCH" : "POST";
+    await api(path, { method, body: payload });
+    await loadStateFromDatabase();
+    clearCaseForm();
+    setInlineMessage(elements.caseMessage, "Tramite guardado.", "success");
+    renderAll();
+  } catch (error) {
+    setInlineMessage(elements.caseMessage, `No pude guardar el tramite: ${error.message}`, "error");
+  }
+}
+
+function clearCaseForm() {
+  editingCaseId = null;
+  elements.caseForm.reset();
+  elements.saveCase.textContent = "Crear tramite";
+  formDirty = false;
+}
+
+function renderCases() {
+  const status = elements.caseFilterStatus.value || "all";
+  const query = clean(elements.caseSearch.value).toLowerCase();
+  const cases = state.cases
+    .filter((item) => status === "all" || item.status === status)
+    .filter((item) => [item.clientName, item.title, item.notes, getService(item.serviceId).title].join(" ").toLowerCase().includes(query));
+
+  if (!cases.length) {
+    elements.caseList.innerHTML = `<div class="empty-state">No hay tramites para la seleccion actual.</div>`;
+    return;
+  }
+
+  elements.caseList.innerHTML = cases.map(renderCaseCard).join("");
+  elements.caseList.querySelectorAll("[data-case-edit]").forEach((button) => {
+    button.addEventListener("click", () => editCase(button.dataset.caseEdit));
+  });
+  elements.caseList.querySelectorAll("[data-case-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteCase(button.dataset.caseDelete));
+  });
+  elements.caseList.querySelectorAll("[data-doc-id]").forEach((button) => {
+    button.addEventListener("click", () => toggleCaseDocument(button.dataset.docId, button.dataset.docStatus));
+  });
+}
+
+function renderCaseCard(item) {
+  const documents = state.caseDocuments.filter((document) => document.caseId === item.id);
+  const pendingDocuments = documents.filter((document) => document.status === "pending").length;
+  const due = item.dueDate ? formatDate(item.dueDate) : "Sin vencimiento";
+  return `
+    <article class="case-card ${item.status}">
+      <div class="case-head">
+        <div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.clientName)} - ${escapeHtml(getService(item.serviceId).title)}</span>
+          <small>${caseStatusLabels[item.status]} - ${due} - ${formatCurrency(item.amount)}</small>
+        </div>
+        <div class="card-actions">
+          <button class="small-action" type="button" data-case-edit="${item.id}">Editar</button>
+          <button class="small-action" type="button" data-case-delete="${item.id}">Eliminar</button>
+        </div>
+      </div>
+      <div class="document-checklist">
+        ${
+          documents.length
+            ? documents.map((document) => renderCaseDocument(document)).join("")
+            : `<span class="empty-state">Sin documentos cargados.</span>`
+        }
+      </div>
+      <div class="agent-summary">
+        <span>Control documental</span>
+        <strong>${pendingDocuments ? `${pendingDocuments} pendientes` : "Documentacion completa"}</strong>
+      </div>
+    </article>
+  `;
+}
+
+function renderCaseDocument(document) {
+  const nextStatus = document.status === "pending" ? "received" : "pending";
+  const label = document.status === "pending" ? "Pendiente" : document.status === "received" ? "Recibido" : "No aplica";
+  return `
+    <button class="document-pill ${document.status}" type="button" data-doc-id="${document.id}" data-doc-status="${nextStatus}">
+      <span>${label}</span>
+      ${escapeHtml(document.label)}
+    </button>
+  `;
+}
+
+function editCase(id) {
+  const item = state.cases.find((caseItem) => caseItem.id === id);
+  if (!item) return;
+  editingCaseId = id;
+  elements.caseClient.value = item.clientId || "";
+  elements.caseService.value = item.serviceId;
+  elements.caseStatus.value = item.status;
+  elements.caseDueDate.value = item.dueDate || "";
+  elements.caseAmount.value = item.amount || "";
+  elements.caseTitle.value = item.title;
+  elements.caseNotes.value = item.notes;
+  elements.saveCase.textContent = "Actualizar tramite";
+  switchView("cases");
+}
+
+async function deleteCase(id) {
+  try {
+    await api(`/api/cases/${id}`, { method: "DELETE" });
+    await loadStateFromDatabase();
+    renderAll();
+  } catch (error) {
+    setInlineMessage(elements.caseMessage, `No pude eliminar el tramite: ${error.message}`, "error");
+  }
+}
+
+async function toggleCaseDocument(id, status) {
+  try {
+    await api(`/api/case-documents/${id}`, { method: "PATCH", body: { status } });
+    await loadStateFromDatabase();
+    renderAll();
+  } catch (error) {
+    setInlineMessage(elements.caseMessage, `No pude actualizar el documento: ${error.message}`, "error");
+  }
+}
+
 function renderCashCategories() {
   const type = elements.cashType.value || "income";
   const categories = cashCategories[type] || cashCategories.income;
@@ -1081,6 +1532,84 @@ function renderCash() {
   renderClosures();
 }
 
+async function submitPaymentRequest(event) {
+  event.preventDefault();
+  const client = state.clients.find((item) => item.id === elements.paymentClient.value);
+  const payload = {
+    clientId: client?.id || null,
+    clientName: client?.name || "Cliente sin ficha",
+    dueDate: elements.paymentDueDate.value,
+    amount: Number(elements.paymentAmount.value),
+    concept: clean(elements.paymentConcept.value),
+    status: "pending",
+  };
+
+  if (!payload.clientName || !payload.dueDate || !payload.amount || !payload.concept) {
+    setCashMessage("Completa cliente, vencimiento, importe y concepto.", "error");
+    return;
+  }
+
+  try {
+    await api("/api/payment-requests", { method: "POST", body: payload });
+    await loadStateFromDatabase();
+    elements.paymentForm.reset();
+    elements.paymentDueDate.value = toDateInput(new Date());
+    setCashMessage("Pago pendiente guardado.", "success");
+    renderAll();
+  } catch (error) {
+    setCashMessage(`No pude guardar el pago pendiente: ${error.message}`, "error");
+  }
+}
+
+function renderPaymentRequests() {
+  const payments = state.paymentRequests.slice().sort((a, b) => {
+    const statusOrder = { pending: 1, paid: 2, cancelled: 3 };
+    return (statusOrder[a.status] - statusOrder[b.status]) || a.dueDate.localeCompare(b.dueDate);
+  });
+
+  if (!payments.length) {
+    elements.paymentRequestList.innerHTML = `<div class="empty-state">No hay pagos pendientes registrados.</div>`;
+    return;
+  }
+
+  elements.paymentRequestList.innerHTML = payments.map(renderPaymentRequest).join("");
+  elements.paymentRequestList.querySelectorAll("[data-payment-action]").forEach((button) => {
+    button.addEventListener("click", () => updatePaymentRequest(button.dataset.paymentId, button.dataset.paymentAction));
+  });
+}
+
+function renderPaymentRequest(payment) {
+  const overdue = payment.status === "pending" && payment.dueDate < toDateInput(new Date()) ? "overdue" : "";
+  return `
+    <article class="payment-item ${payment.status} ${overdue}">
+      <div>
+        <strong>${escapeHtml(payment.concept)} - ${formatCurrency(payment.amount)}</strong>
+        <span>${escapeHtml(payment.clientName)} - vence ${formatDate(payment.dueDate)}</span>
+        <small>${paymentStatusLabels[payment.status]}</small>
+      </div>
+      <div class="card-actions">
+        <button class="small-action" type="button" data-payment-id="${payment.id}" data-payment-action="paid">Pagado</button>
+        <button class="small-action" type="button" data-payment-id="${payment.id}" data-payment-action="cancelled">Cancelar</button>
+        <button class="small-action" type="button" data-payment-id="${payment.id}" data-payment-action="delete">Eliminar</button>
+      </div>
+    </article>
+  `;
+}
+
+async function updatePaymentRequest(id, action) {
+  try {
+    if (action === "delete") {
+      await api(`/api/payment-requests/${id}`, { method: "DELETE" });
+    } else {
+      await api(`/api/payment-requests/${id}`, { method: "PATCH", body: { status: action } });
+    }
+    await loadStateFromDatabase();
+    renderAll();
+  } catch (error) {
+    setCashMessage(`No pude actualizar el pago: ${error.message}`, "error");
+  }
+}
+
 function renderCashTransaction(transaction) {
   const typeLabel = transaction.type === "income" ? "Ingreso" : "Gasto";
   const sign = transaction.type === "income" ? "+" : "-";
@@ -1171,6 +1700,10 @@ function renderDashboard() {
   const monthAppointments = state.appointments.filter((appointment) => isInMonth(appointment.date, month));
   const activeAppointments = monthAppointments.filter((appointment) => appointment.status !== "cancelled");
   const pendingReminders = state.reminders.filter((reminder) => reminder.status === "active").length;
+  const activeCases = state.cases.filter((item) => item.status !== "finished").length;
+  const pendingPayments = state.paymentRequests
+    .filter((payment) => payment.status === "pending")
+    .reduce((total, payment) => total + Number(payment.amount || 0), 0);
   const avgIncome = activeAppointments.length ? totals.income / activeAppointments.length : 0;
 
   elements.dashboardKpis.innerHTML = `
@@ -1185,9 +1718,9 @@ function renderDashboard() {
       <small>${activeAppointments.length} citas activas</small>
     </article>
     <article class="metric-card warning">
-      <span>Recordatorios activos</span>
-      <strong>${pendingReminders}</strong>
-      <small>Seguimientos pendientes</small>
+      <span>Tramites activos</span>
+      <strong>${activeCases}</strong>
+      <small>${pendingReminders} recordatorios - ${formatCurrency(pendingPayments)} por cobrar</small>
     </article>
   `;
 
@@ -1275,6 +1808,14 @@ function renderDashboardInsights() {
     .filter((reminder) => reminder.status === "active")
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
     .slice(0, 3);
+  const urgentCases = state.cases
+    .filter((item) => item.status !== "finished" && item.dueDate)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 3);
+  const pendingPayments = state.paymentRequests
+    .filter((payment) => payment.status === "pending")
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 3);
   const items = [
     ...upcomingAppointments.map((appointment) => ({
       title: `${formatDate(appointment.date)} - ${appointment.time}`,
@@ -1283,6 +1824,14 @@ function renderDashboardInsights() {
     ...activeReminders.map((reminder) => ({
       title: `Recordatorio: ${reminder.title}`,
       text: formatDateTime(reminder.dueAt),
+    })),
+    ...urgentCases.map((item) => ({
+      title: `Tramite: ${item.title}`,
+      text: `${item.clientName} - ${caseStatusLabels[item.status]} - ${formatDate(item.dueDate)}`,
+    })),
+    ...pendingPayments.map((payment) => ({
+      title: `Cobro pendiente: ${formatCurrency(payment.amount)}`,
+      text: `${payment.clientName} - ${payment.concept} - ${formatDate(payment.dueDate)}`,
     })),
   ];
 
@@ -1301,6 +1850,171 @@ function renderDashboardInsights() {
       `,
     )
     .join("");
+}
+
+function renderTemplateSelectors() {
+  renderClientOptions();
+}
+
+function renderTemplate() {
+  const template = messageTemplates.find((item) => item.id === elements.templateType.value) || messageTemplates[0];
+  const client = state.clients.find((item) => item.id === elements.templateClient.value) || {
+    name: "cliente",
+  };
+  elements.templateOutput.value = template.build(client);
+}
+
+async function copyTemplateText() {
+  try {
+    await navigator.clipboard.writeText(elements.templateOutput.value);
+    setInlineMessage(elements.templateMessage, "Mensaje copiado.", "success");
+  } catch {
+    setInlineMessage(elements.templateMessage, "No pude copiar automaticamente. El texto queda listo para seleccionar.", "error");
+  }
+}
+
+function renderAssistantInsights() {
+  const today = toDateInput(new Date());
+  const pendingAppointments = state.appointments.filter((appointment) => appointment.status === "pending").length;
+  const overduePayments = state.paymentRequests.filter(
+    (payment) => payment.status === "pending" && payment.dueDate < today,
+  );
+  const documentIssues = state.cases
+    .map((item) => ({
+      item,
+      pending: state.caseDocuments.filter((document) => document.caseId === item.id && document.status === "pending").length,
+    }))
+    .filter((entry) => entry.pending > 0)
+    .slice(0, 4);
+  const month = toMonthInput(new Date());
+  const thisMonth = summarizeCash(state.cashTransactions.filter((transaction) => isInMonth(transaction.date, month)));
+  const insights = [
+    pendingAppointments
+      ? `${pendingAppointments} citas pendientes de confirmar.`
+      : "No hay citas pendientes de confirmar.",
+    overduePayments.length
+      ? `${overduePayments.length} pagos vencidos por revisar.`
+      : "No hay pagos vencidos.",
+    documentIssues.length
+      ? `${documentIssues.length} tramites con documentacion pendiente.`
+      : "Los tramites activos no muestran alertas documentales principales.",
+    `Saldo de caja del mes: ${formatCurrency(thisMonth.balance)}.`,
+  ];
+
+  elements.assistantInsights.innerHTML = insights
+    .map(
+      (text) => `
+        <article class="insight-item">
+          <strong>${escapeHtml(text)}</strong>
+          <span>${formatDate(today)}</span>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+async function copyBackupPath() {
+  try {
+    await navigator.clipboard.writeText(state.meta.backupDir || "");
+    showMessage("Ruta de backups copiada.", "success");
+  } catch {
+    showMessage("No pude copiar la ruta automaticamente.", "error");
+  }
+}
+
+function exportFullCsv() {
+  downloadCsv("agenda-martin-acosta-clientes.csv", ["nombre", "documento", "telefono", "email", "direccion", "notas"], state.clients.map((client) => [
+    client.name,
+    client.document,
+    client.phone,
+    client.email,
+    client.address,
+    client.notes,
+  ]));
+  downloadCsv("agenda-martin-acosta-tramites.csv", ["cliente", "tramite", "tipo", "estado", "vencimiento", "honorarios", "notas"], state.cases.map((item) => [
+    item.clientName,
+    item.title,
+    getService(item.serviceId).title,
+    caseStatusLabels[item.status],
+    item.dueDate,
+    item.amount,
+    item.notes,
+  ]));
+  downloadCsv("agenda-martin-acosta-caja.csv", ["fecha", "tipo", "categoria", "concepto", "medio", "cliente_proveedor", "importe", "notas"], state.cashTransactions.map((transaction) => [
+    transaction.date,
+    transaction.type,
+    transaction.category,
+    transaction.concept,
+    transaction.paymentMethod,
+    transaction.party,
+    transaction.amount,
+    transaction.notes,
+  ]));
+  showMessage("Exportaciones CSV generadas.", "success");
+}
+
+function hydrateSecurity() {
+  const minutes = localStorage.getItem("agenda-lock-minutes") || "0";
+  elements.lockMinutes.value = minutes;
+  if (localStorage.getItem("agenda-security-pin") && localStorage.getItem("agenda-security-skip") !== "true") {
+    lockApp();
+  }
+}
+
+async function saveSecuritySettings() {
+  const pin = clean(elements.securityPin.value);
+  if (pin && !/^\d{4,8}$/.test(pin)) {
+    setInlineMessage(elements.securityMessage, "El PIN debe tener entre 4 y 8 digitos.", "error");
+    return;
+  }
+  if (pin) {
+    localStorage.setItem("agenda-security-pin", await hashText(pin));
+    localStorage.removeItem("agenda-security-skip");
+  }
+  localStorage.setItem("agenda-lock-minutes", elements.lockMinutes.value);
+  elements.securityPin.value = "";
+  setInlineMessage(elements.securityMessage, "Seguridad local guardada.", "success");
+}
+
+function lockApp() {
+  if (!localStorage.getItem("agenda-security-pin")) {
+    setInlineMessage(elements.securityMessage, "Primero configura un PIN.", "error");
+    return;
+  }
+  elements.lockScreen.hidden = false;
+  elements.unlockPin.value = "";
+  elements.unlockPin.focus();
+}
+
+async function unlockApp() {
+  const stored = localStorage.getItem("agenda-security-pin");
+  if (!stored) {
+    elements.lockScreen.hidden = true;
+    return;
+  }
+  const provided = await hashText(elements.unlockPin.value);
+  if (provided !== stored) {
+    elements.lockMessage.style.color = "var(--rose)";
+    elements.lockMessage.textContent = "PIN incorrecto.";
+    return;
+  }
+  elements.lockScreen.hidden = true;
+  elements.lockMessage.textContent = "";
+  lastActivityAt = Date.now();
+}
+
+function startSecurityWatcher() {
+  window.setInterval(() => {
+    const minutes = Number(localStorage.getItem("agenda-lock-minutes") || 0);
+    if (!minutes || elements.lockScreen.hidden === false || !localStorage.getItem("agenda-security-pin")) return;
+    if (Date.now() - lastActivityAt > minutes * 60 * 1000) lockApp();
+  }, 15000);
+}
+
+async function hashText(value) {
+  const data = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function renderDataStatus() {
@@ -1488,6 +2202,10 @@ function isInMonth(dateValue, monthValue) {
   return String(dateValue || "").slice(0, 7) === monthValue;
 }
 
+function sameText(a, b) {
+  return clean(a).toLowerCase() === clean(b).toLowerCase();
+}
+
 function summarizeCash(transactions) {
   return transactions.reduce(
     (totals, transaction) => {
@@ -1519,6 +2237,17 @@ function getRecentMonths(selectedMonth, count) {
 
 function csvCell(value) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function downloadCsv(fileName, headers, rows) {
+  const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function escapeHtml(value) {
@@ -1553,6 +2282,24 @@ function hasUnsavedFormData() {
     clean(elements.cashConcept.value) ||
     clean(elements.cashNotes.value);
 
+  const clientHasData =
+    clean(elements.clientFullName.value) ||
+    clean(elements.clientDoc.value) ||
+    clean(elements.clientTel.value) ||
+    clean(elements.clientMail.value) ||
+    clean(elements.clientAddress.value) ||
+    clean(elements.clientNotes.value);
+
+  const caseHasData =
+    clean(elements.caseTitle.value) ||
+    clean(elements.caseAmount.value) ||
+    clean(elements.caseNotes.value) ||
+    clean(elements.caseDueDate.value);
+
+  const paymentHasData =
+    clean(elements.paymentAmount.value) ||
+    clean(elements.paymentConcept.value);
+
   const settingsChanged =
     elements.startHour.value !== state.settings.startHour ||
     elements.endHour.value !== state.settings.endHour ||
@@ -1561,5 +2308,8 @@ function hasUnsavedFormData() {
     JSON.stringify([...document.querySelectorAll(".weekdays input:checked")].map((input) => Number(input.value))) !==
       JSON.stringify(state.settings.weekdays);
 
-  return Boolean(formDirty && (bookingHasData || reminderHasData || cashHasData || settingsChanged));
+  return Boolean(
+    formDirty &&
+      (bookingHasData || reminderHasData || cashHasData || clientHasData || caseHasData || paymentHasData || settingsChanged),
+  );
 }

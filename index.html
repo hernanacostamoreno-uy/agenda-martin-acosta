@@ -8,6 +8,18 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="lock-screen" id="lockScreen" hidden>
+      <div class="lock-panel">
+        <img class="lock-logo" src="assets/agenda-logo.png" alt="" />
+        <p class="eyebrow">Acceso privado</p>
+        <h2>Agenda Martin Acosta</h2>
+        <p>Ingresa el PIN local para abrir la informacion del estudio.</p>
+        <input id="unlockPin" type="password" inputmode="numeric" placeholder="PIN" />
+        <button class="primary-action" id="unlockApp" type="button">Abrir aplicacion</button>
+        <button class="secondary-action" id="skipPinSetup" type="button">Usar sin PIN</button>
+        <p class="form-message" id="lockMessage" role="status"></p>
+      </div>
+    </div>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Navegacion principal">
         <div class="brand">
@@ -28,9 +40,21 @@
             <span aria-hidden="true">#</span>
             Agenda
           </button>
+          <button class="nav-tab" type="button" data-view="clients">
+            <span aria-hidden="true">CL</span>
+            Clientes
+          </button>
+          <button class="nav-tab" type="button" data-view="cases">
+            <span aria-hidden="true">TR</span>
+            Tramites
+          </button>
           <button class="nav-tab" type="button" data-view="cash">
             <span aria-hidden="true">$</span>
             Caja
+          </button>
+          <button class="nav-tab" type="button" data-view="templates">
+            <span aria-hidden="true">MS</span>
+            Plantillas
           </button>
           <button class="nav-tab" type="button" data-view="dashboard">
             <span aria-hidden="true">%</span>
@@ -252,6 +276,149 @@
           </div>
         </section>
 
+        <section class="view" id="clientsView">
+          <div class="split-layout">
+            <form class="panel" id="clientForm">
+              <div class="section-title">
+                <span>CL</span>
+                <div>
+                  <h3>Ficha de cliente</h3>
+                  <p>Datos de contacto, documento e historial operativo.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label>
+                  Nombre completo
+                  <input id="clientFullName" name="name" type="text" required />
+                </label>
+                <label>
+                  Documento
+                  <input id="clientDoc" name="document" type="text" />
+                </label>
+                <label>
+                  Telefono
+                  <input id="clientTel" name="phone" type="tel" />
+                </label>
+                <label>
+                  Email
+                  <input id="clientMail" name="email" type="email" />
+                </label>
+              </div>
+              <label class="full-label">
+                Direccion
+                <input id="clientAddress" name="address" type="text" />
+              </label>
+              <label class="full-label">
+                Observaciones internas
+                <textarea id="clientNotes" name="notes" rows="4"></textarea>
+              </label>
+              <div class="form-actions">
+                <button class="primary-action" id="saveClient" type="submit">Guardar cliente</button>
+                <button class="secondary-action" id="clearClientForm" type="button">Limpiar</button>
+              </div>
+              <p class="form-message" id="clientMessage" role="status"></p>
+            </form>
+
+            <section class="panel">
+              <div class="section-title">
+                <span>#</span>
+                <div>
+                  <h3>Clientes</h3>
+                  <p>Busqueda por nombre, documento, telefono o email.</p>
+                </div>
+              </div>
+              <label class="full-label">
+                Buscar cliente
+                <input id="clientSearch" type="search" placeholder="Nombre, documento, telefono..." />
+              </label>
+              <div class="client-list" id="clientList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="casesView">
+          <div class="split-layout">
+            <form class="panel" id="caseForm">
+              <div class="section-title">
+                <span>TR</span>
+                <div>
+                  <h3>Tramite notarial</h3>
+                  <p>Seguimiento de trabajo, documentos pendientes y fecha limite.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label>
+                  Cliente
+                  <select id="caseClient" name="clientId"></select>
+                </label>
+                <label>
+                  Tipo
+                  <select id="caseService" name="serviceId"></select>
+                </label>
+                <label>
+                  Estado
+                  <select id="caseStatus" name="status">
+                    <option value="started">Iniciado</option>
+                    <option value="waiting_documents">Esperando documentos</option>
+                    <option value="drafting">En redaccion</option>
+                    <option value="ready_to_sign">Listo para firma</option>
+                    <option value="finished">Finalizado</option>
+                  </select>
+                </label>
+                <label>
+                  Fecha limite
+                  <input id="caseDueDate" name="dueDate" type="date" />
+                </label>
+                <label>
+                  Honorarios estimados
+                  <input id="caseAmount" name="amount" type="number" min="0" step="0.01" />
+                </label>
+              </div>
+              <label class="full-label">
+                Titulo
+                <input id="caseTitle" name="title" type="text" placeholder="Ej.: Compraventa inmueble Padron..." required />
+              </label>
+              <label class="full-label">
+                Notas del tramite
+                <textarea id="caseNotes" name="notes" rows="4"></textarea>
+              </label>
+              <div class="form-actions">
+                <button class="primary-action" id="saveCase" type="submit">Crear tramite</button>
+                <button class="secondary-action" id="clearCaseForm" type="button">Limpiar</button>
+              </div>
+              <p class="form-message" id="caseMessage" role="status"></p>
+            </form>
+
+            <section class="panel">
+              <div class="section-title">
+                <span>OK</span>
+                <div>
+                  <h3>Tramites activos</h3>
+                  <p>Estados, documentos pendientes y vencimientos.</p>
+                </div>
+              </div>
+              <div class="case-filters">
+                <label>
+                  Estado
+                  <select id="caseFilterStatus">
+                    <option value="all">Todos</option>
+                    <option value="started">Iniciados</option>
+                    <option value="waiting_documents">Esperando documentos</option>
+                    <option value="drafting">En redaccion</option>
+                    <option value="ready_to_sign">Listos para firma</option>
+                    <option value="finished">Finalizados</option>
+                  </select>
+                </label>
+                <label>
+                  Buscar
+                  <input id="caseSearch" type="search" placeholder="Cliente, tramite, notas..." />
+                </label>
+              </div>
+              <div class="case-list" id="caseList"></div>
+            </section>
+          </div>
+        </section>
+
         <section class="view" id="cashView">
           <div class="cash-layout">
             <form class="panel cash-form" id="cashForm">
@@ -364,6 +531,79 @@
             </div>
             <div class="cash-list" id="cashTransactionList"></div>
           </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <span>!</span>
+              <div>
+                <h3>Pagos pendientes</h3>
+                <p>Cobros esperados, vencimientos y pagos marcados como realizados.</p>
+              </div>
+            </div>
+            <form class="payment-form" id="paymentForm">
+              <div class="form-grid">
+                <label>
+                  Cliente
+                  <select id="paymentClient" name="clientId"></select>
+                </label>
+                <label>
+                  Vencimiento
+                  <input id="paymentDueDate" name="dueDate" type="date" required />
+                </label>
+                <label>
+                  Importe
+                  <input id="paymentAmount" name="amount" type="number" min="0.01" step="0.01" required />
+                </label>
+              </div>
+              <label class="full-label">
+                Concepto
+                <input id="paymentConcept" name="concept" type="text" placeholder="Ej.: saldo de honorarios" required />
+              </label>
+              <button class="primary-action" id="savePaymentRequest" type="submit">Guardar pago pendiente</button>
+            </form>
+            <div class="payment-list" id="paymentRequestList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="templatesView">
+          <div class="split-layout">
+            <section class="panel">
+              <div class="section-title">
+                <span>MS</span>
+                <div>
+                  <h3>Plantillas de mensajes</h3>
+                  <p>Mensajes profesionales para WhatsApp o email.</p>
+                </div>
+              </div>
+              <div class="template-controls">
+                <label>
+                  Plantilla
+                  <select id="templateType"></select>
+                </label>
+                <label>
+                  Cliente
+                  <select id="templateClient"></select>
+                </label>
+              </div>
+              <textarea id="templateOutput" rows="10"></textarea>
+              <div class="form-actions">
+                <button class="primary-action" id="copyTemplate" type="button">Copiar mensaje</button>
+                <button class="secondary-action" id="refreshTemplate" type="button">Actualizar</button>
+              </div>
+              <p class="form-message" id="templateMessage" role="status"></p>
+            </section>
+
+            <section class="panel">
+              <div class="section-title">
+                <span>A</span>
+                <div>
+                  <h3>Asistente de gestion</h3>
+                  <p>Alertas automaticas basadas en los datos cargados.</p>
+                </div>
+              </div>
+              <div class="assistant-insights" id="assistantInsights"></div>
+            </section>
+          </div>
         </section>
 
         <section class="view" id="dashboardView">
@@ -503,6 +743,40 @@
                 </div>
               </div>
               <button class="primary-action" id="backupNow" type="button">Crear backup ahora</button>
+              <div class="settings-actions">
+                <button class="secondary-action" id="copyBackupPath" type="button">Copiar carpeta de backups</button>
+                <button class="secondary-action" id="exportFullCsv" type="button">Exportar todo CSV</button>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="section-title">
+                <span>PIN</span>
+                <div>
+                  <h3>Seguridad local</h3>
+                  <p>PIN de apertura y bloqueo automatico por inactividad.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label>
+                  Nuevo PIN
+                  <input id="securityPin" type="password" inputmode="numeric" placeholder="4 a 8 digitos" />
+                </label>
+                <label>
+                  Bloqueo automatico
+                  <select id="lockMinutes">
+                    <option value="0">Desactivado</option>
+                    <option value="5">5 minutos</option>
+                    <option value="15">15 minutos</option>
+                    <option value="30">30 minutos</option>
+                  </select>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button class="primary-action" id="saveSecurity" type="button">Guardar seguridad</button>
+                <button class="secondary-action" id="lockNow" type="button">Bloquear ahora</button>
+              </div>
+              <p class="form-message" id="securityMessage" role="status"></p>
             </div>
           </div>
         </section>
